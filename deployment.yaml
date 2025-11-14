@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healthcheckservice-deployment
+  namespace: healthcheckservice-ns
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: healthcheckservice
+  template:
+    metadata:
+      labels:
+        app: healthcheckservice
+    spec:
+      containers:
+        - name: healthcheckservice-container
+          image: demo-img:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8100

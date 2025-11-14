@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: healthcheckservice-service
+  namespace: healthcheckservice-ns
+spec:
+  type: NodePort
+  selector:
+    app: healthcheckservice
+  ports:
+    - port: 8080        # service port inside cluster
+      targetPort: 8080  # container port
+      nodePort: 30081   # host port (must be in the NodePort range, usually 30000-32767)
