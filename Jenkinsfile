@@ -9,7 +9,8 @@ pipeline {
     }
 
     stages {
-        // ---------------------------------------------  
+
+        // ---------------------------------------------
         stage('Checkout') {
             steps {
                 echo "Checking out source code..."
@@ -26,8 +27,8 @@ pipeline {
         stage('Build JAR using Maven') {
             steps {
                 echo "Building JAR file..."
-                bat """
-                    mvn clean package -DskipTests
+                sh """
+                    mvn -B clean package -DskipTests
                 """
             }
         }
@@ -36,8 +37,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo "Building Docker Image..."
-                bat """
-                    docker build -t %IMAGE_NAME% .
+                sh """
+                    docker build -t ${IMAGE_NAME} .
                 """
             }
         }
@@ -52,10 +53,10 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    bat """
-                        docker login -u %DOCKER_USER% -p %DOCKER_PASS%
-                        docker tag %IMAGE_NAME% %DOCKER_USER%/%APP_NAME%:%BUILD_NUMBER%
-                        docker push %DOCKER_USER%/%APP_NAME%:%BUILD_NUMBER%
+                    sh """
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker tag ${IMAGE_NAME} $DOCKER_USER/${APP_NAME}:${BUILD_NUMBER}
+                        docker push $DOCKER_USER/${APP_NAME}:${BUILD_NUMBER}
                     """
                 }
             }
@@ -64,13 +65,11 @@ pipeline {
         // ---------------------------------------------
         stage('Generate Kubernetes YAML Files') {
             steps {
-                echo "Generating Kubernetes deployment YAML..."
-
-                // Using envsubst on Windows
-                bat """
-                    powershell -Command "(Get-Content namespace-template.yaml) -replace '\\$NAMESPACE', '%NAMESPACE%' | Out-File namespace.yaml"
-                    powershell -Command "(Get-Content deployment-template.yaml) -replace '\\$IMAGE_NAME', '%docker_user%/%APP_NAME%:%BUILD_NUMBER%' | Out-File deployment.yaml"
-                    powershell -Command "(Get-Content service-template.yaml) -replace '\\$NAMESPACE', '%NAMESPACE%' | Out-File service.yaml"
+                echo "Generating Kubernetes YAML Files..."
+                sh """
+                    envsubst < namespace-template.yaml > namespace.yaml
+                    envsubst < deployment-template.yaml > deployment.yaml
+                    envsubst < service-template.yaml > service.yaml
                 """
             }
         }
@@ -81,10 +80,10 @@ pipeline {
                 echo "Applying Kubernetes manifests..."
 
                 withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-                    bat """
-                        kubectl --kubeconfig="%KUBECONFIG%" apply -f namespace.yaml
-                        kubectl --kubeconfig="%KUBECONFIG%" apply -f deployment.yaml
-                        kubectl --kubeconfig="%KUBECONFIG%" apply -f service.yaml
+                    sh """
+                        kubectl --kubeconfig=$KUBECONFIG apply -f namespace.yaml
+                        kubectl --kubeconfig=$KUBECONFIG apply -f deployment.yaml
+                        kubectl --kubeconfig=$KUBECONFIG apply -f service.yaml
                     """
                 }
             }
